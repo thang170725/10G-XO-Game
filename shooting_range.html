@@ -1,0 +1,1770 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Precision Shooting Range</title>
+
+<style>
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html,
+body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #000;
+    font-family: Arial, Helvetica, sans-serif;
+    user-select: none;
+}
+
+/* =========================
+   GAME
+========================= */
+
+#game {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+
+    background:
+        linear-gradient(
+            to bottom,
+            #6f8790 0%,
+            #9fb1ae 35%,
+            #65745f 65%,
+            #34402f 100%
+        );
+
+    cursor: default;
+}
+
+/* =========================
+   DISTANT RANGE
+========================= */
+
+.sky {
+    position: absolute;
+    inset: 0;
+
+    background:
+        radial-gradient(
+            ellipse at center top,
+            rgba(255,255,255,0.18),
+            transparent 55%
+        );
+}
+
+.mountain-back {
+    position: absolute;
+    left: -10%;
+    bottom: 31%;
+    width: 120%;
+    height: 30%;
+
+    background: #53645f;
+
+    clip-path: polygon(
+        0% 100%,
+        8% 60%,
+        17% 78%,
+        28% 38%,
+        39% 75%,
+        50% 30%,
+        62% 72%,
+        74% 44%,
+        86% 73%,
+        100% 52%,
+        100% 100%
+    );
+
+    opacity: 0.8;
+}
+
+.mountain-front {
+    position: absolute;
+    left: -10%;
+    bottom: 23%;
+    width: 120%;
+    height: 23%;
+
+    background: #3d4b3d;
+
+    clip-path: polygon(
+        0% 100%,
+        12% 55%,
+        25% 80%,
+        36% 48%,
+        50% 83%,
+        64% 45%,
+        78% 76%,
+        90% 52%,
+        100% 70%,
+        100% 100%
+    );
+}
+
+.ground {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 27%;
+
+    background:
+        repeating-linear-gradient(
+            90deg,
+            transparent 0,
+            transparent 20px,
+            rgba(0,0,0,0.04) 21px,
+            transparent 22px
+        ),
+        linear-gradient(
+            to bottom,
+            #485941,
+            #263025
+        );
+}
+
+/* =========================
+   TARGET
+========================= */
+
+#target {
+    position: absolute;
+
+    /*
+        Target cố định.
+        Không bao giờ chạy theo chuột.
+    */
+    left: 50%;
+    top: 39%;
+
+    transform: translate(-50%, -50%);
+
+    width: 170px;
+    height: 170px;
+
+    border-radius: 50%;
+
+    background:
+        radial-gradient(
+            circle,
+            #111 0%,
+            #111 7%,
+            #eee 7.5%,
+            #eee 18%,
+            #111 18.5%,
+            #111 30%,
+            #eee 30.5%,
+            #eee 42%,
+            #111 42.5%,
+            #111 54%,
+            #eee 54.5%,
+            #eee 66%,
+            #111 66.5%,
+            #111 78%,
+            #eee 78.5%,
+            #eee 100%
+        );
+
+    box-shadow:
+        0 0 0 2px #111,
+        0 10px 20px rgba(0,0,0,0.35);
+
+    transition:
+        width 0.15s ease,
+        height 0.15s ease;
+}
+
+/*
+    Hồng tâm thật.
+    Đây là tọa độ mà game dùng để kiểm tra hit.
+*/
+#target-center {
+    position: absolute;
+
+    left: 50%;
+    top: 50%;
+
+    width: 12px;
+    height: 12px;
+
+    transform: translate(-50%, -50%);
+
+    border-radius: 50%;
+
+    background: #d71920;
+
+    box-shadow:
+        0 0 0 1px #000,
+        0 0 8px rgba(255,0,0,0.7);
+}
+
+/* target stand */
+
+.target-stand {
+    position: absolute;
+
+    left: 50%;
+    top: calc(39% + 85px);
+
+    width: 8px;
+    height: 170px;
+
+    transform: translateX(-50%);
+
+    background: #262626;
+}
+
+.target-base {
+    position: absolute;
+
+    left: 50%;
+    top: calc(39% + 245px);
+
+    width: 100px;
+    height: 12px;
+
+    transform: translateX(-50%);
+
+    background: #202020;
+}
+
+/* =========================
+   SCOPE
+========================= */
+
+#scope {
+    position: absolute;
+    inset: 0;
+
+    pointer-events: none;
+}
+
+/*
+    Kính ngắm hình tròn.
+*/
+
+.scope-ring {
+    position: absolute;
+
+    left: 50%;
+    top: 50%;
+
+    width: min(82vh, 82vw);
+    height: min(82vh, 82vw);
+
+    transform: translate(-50%, -50%);
+
+    border-radius: 50%;
+
+    border: 2px solid rgba(255,255,255,0.35);
+
+    box-shadow:
+        0 0 0 9999px rgba(0,0,0,0.68),
+        inset 0 0 30px rgba(0,0,0,0.35);
+}
+
+/* =========================
+   CROSSHAIR / TÂM RUỒI
+========================= */
+
+#crosshair {
+    position: absolute;
+
+    /*
+        Quan trọng:
+
+        Tâm ruồi bắt đầu ở chính giữa màn hình.
+        Sau đó chỉ WASD / Arrow Keys mới thay đổi nó.
+    */
+
+    left: 50%;
+    top: 50%;
+
+    width: 60px;
+    height: 60px;
+
+    transform: translate(-50%, -50%);
+
+    pointer-events: none;
+}
+
+/* vertical */
+
+#crosshair::before {
+    content: "";
+
+    position: absolute;
+
+    left: 50%;
+    top: 0;
+
+    width: 1px;
+    height: 100%;
+
+    transform: translateX(-50%);
+
+    background: rgba(255,255,255,0.9);
+
+    box-shadow:
+        0 0 2px #000;
+}
+
+/* horizontal */
+
+#crosshair::after {
+    content: "";
+
+    position: absolute;
+
+    left: 0;
+    top: 50%;
+
+    width: 100%;
+    height: 1px;
+
+    transform: translateY(-50%);
+
+    background: rgba(255,255,255,0.9);
+
+    box-shadow:
+        0 0 2px #000;
+}
+
+/* central red dot */
+
+.crosshair-dot {
+    position: absolute;
+
+    left: 50%;
+    top: 50%;
+
+    width: 6px;
+    height: 6px;
+
+    transform: translate(-50%, -50%);
+
+    border-radius: 50%;
+
+    background: #ff1d25;
+
+    box-shadow:
+        0 0 0 1px #000,
+        0 0 5px rgba(255,0,0,0.9);
+}
+
+/* =========================
+   CROSSHAIR MOVE AREA
+========================= */
+
+#aim-position {
+    position: absolute;
+
+    left: 50%;
+    top: 50%;
+
+    width: 0;
+    height: 0;
+
+    pointer-events: none;
+}
+
+/* =========================
+   HUD
+========================= */
+
+#hud {
+    position: absolute;
+
+    top: 20px;
+    left: 20px;
+    right: 20px;
+
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+
+    pointer-events: none;
+
+    z-index: 50;
+}
+
+.panel {
+    padding: 12px 16px;
+
+    min-width: 150px;
+
+    color: white;
+
+    background: rgba(0,0,0,0.55);
+
+    border: 1px solid rgba(255,255,255,0.2);
+
+    border-radius: 8px;
+
+    backdrop-filter: blur(5px);
+}
+
+.label {
+    font-size: 11px;
+
+    color: #aaa;
+
+    letter-spacing: 1px;
+
+    margin-bottom: 4px;
+}
+
+.value {
+    font-size: 24px;
+
+    font-weight: bold;
+}
+
+/* =========================
+   HELP
+========================= */
+
+#help {
+    position: absolute;
+
+    bottom: 22px;
+    left: 50%;
+
+    transform: translateX(-50%);
+
+    z-index: 60;
+
+    padding: 12px 20px;
+
+    color: white;
+
+    background: rgba(0,0,0,0.6);
+
+    border-radius: 8px;
+
+    text-align: center;
+
+    font-size: 14px;
+
+    line-height: 1.7;
+}
+
+.key {
+    display: inline-block;
+
+    padding: 2px 7px;
+
+    margin: 0 2px;
+
+    border: 1px solid #888;
+
+    border-radius: 4px;
+
+    background: #222;
+
+    color: white;
+
+    font-weight: bold;
+}
+
+/* =========================
+   START SCREEN
+========================= */
+
+#start-screen,
+#game-over {
+    position: absolute;
+
+    inset: 0;
+
+    z-index: 100;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    background: rgba(0,0,0,0.78);
+}
+
+.modal {
+    width: min(520px, 90vw);
+
+    padding: 40px;
+
+    text-align: center;
+
+    color: white;
+
+    background:
+        linear-gradient(
+            145deg,
+            rgba(35,35,35,0.98),
+            rgba(15,15,15,0.98)
+        );
+
+    border: 1px solid rgba(255,255,255,0.18);
+
+    border-radius: 16px;
+
+    box-shadow:
+        0 30px 80px rgba(0,0,0,0.7);
+}
+
+.modal h1 {
+    font-size: 34px;
+
+    margin-bottom: 15px;
+
+    letter-spacing: 2px;
+}
+
+.modal p {
+    color: #bbb;
+
+    line-height: 1.7;
+
+    margin-bottom: 25px;
+}
+
+button {
+    padding: 14px 30px;
+
+    border: none;
+
+    border-radius: 8px;
+
+    background: #d71920;
+
+    color: white;
+
+    font-size: 16px;
+
+    font-weight: bold;
+
+    cursor: pointer;
+}
+
+button:hover {
+    background: #f02028;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* =========================
+   SHOT EFFECT
+========================= */
+
+#shot-flash {
+    position: absolute;
+
+    inset: 0;
+
+    background: white;
+
+    opacity: 0;
+
+    pointer-events: none;
+
+    z-index: 80;
+}
+
+.flash {
+    animation: flash 0.08s linear;
+}
+
+@keyframes flash {
+    0% {
+        opacity: 0.5;
+    }
+
+    100% {
+        opacity: 0;
+    }
+}
+
+/* =========================
+   HIT TEXT
+========================= */
+
+#hit-text {
+    position: absolute;
+
+    left: 50%;
+    top: 25%;
+
+    transform: translateX(-50%);
+
+    z-index: 70;
+
+    font-size: 40px;
+
+    font-weight: bold;
+
+    color: #fff;
+
+    text-shadow:
+        0 3px 8px #000;
+
+    opacity: 0;
+
+    pointer-events: none;
+}
+
+.hit-animation {
+    animation: hitText 0.7s ease-out;
+}
+
+@keyframes hitText {
+    0% {
+        opacity: 1;
+        transform: translate(-50%, 0) scale(1);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -60px) scale(1.3);
+    }
+}
+
+/* =========================
+   BULLET HOLE
+========================= */
+
+.bullet-hole {
+    position: absolute;
+
+    width: 7px;
+    height: 7px;
+
+    border-radius: 50%;
+
+    background: #050505;
+
+    border: 1px solid #777;
+
+    transform: translate(-50%, -50%);
+
+    z-index: 20;
+}
+
+/* =========================
+   ZOOM
+========================= */
+
+#game.zoomed #target {
+    width: 300px;
+    height: 300px;
+}
+
+#game.zoomed .scope-ring {
+    width: min(70vh, 70vw);
+    height: min(70vh, 70vw);
+}
+</style>
+</head>
+
+<body>
+
+<div id="game">
+
+    <div class="sky"></div>
+
+    <div class="mountain-back"></div>
+    <div class="mountain-front"></div>
+    <div class="ground"></div>
+
+    <!-- TARGET -->
+
+    <div id="target">
+        <div id="target-center"></div>
+    </div>
+
+    <div class="target-stand"></div>
+    <div class="target-base"></div>
+
+    <!-- SCOPE -->
+
+    <div id="scope">
+        <div class="scope-ring"></div>
+    </div>
+
+    <!-- AIM POSITION -->
+
+    <div id="aim-position">
+
+        <div id="crosshair">
+            <div class="crosshair-dot"></div>
+        </div>
+
+    </div>
+
+    <!-- HUD -->
+
+    <div id="hud">
+
+        <div class="panel">
+
+            <div class="label">
+                SCORE
+            </div>
+
+            <div
+                class="value"
+                id="score"
+            >
+                0
+            </div>
+
+        </div>
+
+        <div class="panel">
+
+            <div class="label">
+                ROUND
+            </div>
+
+            <div
+                class="value"
+                id="round"
+            >
+                1 / 10
+            </div>
+
+        </div>
+
+        <div class="panel">
+
+            <div class="label">
+                DISTANCE
+            </div>
+
+            <div
+                class="value"
+                id="distance"
+            >
+                50 m
+            </div>
+
+        </div>
+
+        <div class="panel">
+
+            <div class="label">
+                MODE
+            </div>
+
+            <div
+                class="value"
+                id="mode"
+            >
+                1X
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- HELP -->
+
+    <div id="help">
+
+        <span class="key">W</span>
+        <span class="key">A</span>
+        <span class="key">S</span>
+        <span class="key">D</span>
+        hoặc
+        <span class="key">↑</span>
+        <span class="key">←</span>
+        <span class="key">↓</span>
+        <span class="key">→</span>
+        để chỉnh tâm ruồi
+
+        <br>
+
+        <span class="key">SPACE</span>
+        hoặc
+        <span class="key">CLICK</span>
+        để bắn
+
+        &nbsp;&nbsp;
+
+        <span class="key">Z</span>
+        Zoom
+
+        &nbsp;&nbsp;
+
+        <span class="key">R</span>
+        Reset tâm
+
+    </div>
+
+    <!-- FLASH -->
+
+    <div id="shot-flash"></div>
+
+    <!-- HIT TEXT -->
+
+    <div id="hit-text"></div>
+
+    <!-- START -->
+
+    <div id="start-screen">
+
+        <div class="modal">
+
+            <h1>
+                PRECISION RANGE
+            </h1>
+
+            <p>
+                Mô phỏng bắn bia chính xác.<br>
+                Dùng phím để điều chỉnh tâm ruồi,
+                căn đúng hồng tâm rồi bắn.
+            </p>
+
+            <button id="start-button">
+                BẮT ĐẦU
+            </button>
+
+        </div>
+
+    </div>
+
+    <!-- GAME OVER -->
+
+    <div
+        id="game-over"
+        class="hidden"
+    >
+
+        <div class="modal">
+
+            <h1>
+                KẾT THÚC
+            </h1>
+
+            <p>
+                Điểm của bạn:
+            </p>
+
+            <div
+                id="final-score"
+                style="
+                    font-size:52px;
+                    font-weight:bold;
+                    margin-bottom:25px;
+                "
+            >
+                0
+            </div>
+
+            <button id="restart-button">
+                BẮN LẠI
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<script>
+
+/* =========================================================
+   GAME STATE
+========================================================= */
+
+const game = document.getElementById("game");
+
+const target = document.getElementById("target");
+
+const targetCenter =
+    document.getElementById("target-center");
+
+const aimPosition =
+    document.getElementById("aim-position");
+
+const crosshair =
+    document.getElementById("crosshair");
+
+const scoreElement =
+    document.getElementById("score");
+
+const roundElement =
+    document.getElementById("round");
+
+const distanceElement =
+    document.getElementById("distance");
+
+const modeElement =
+    document.getElementById("mode");
+
+const hitText =
+    document.getElementById("hit-text");
+
+const shotFlash =
+    document.getElementById("shot-flash");
+
+const startScreen =
+    document.getElementById("start-screen");
+
+const gameOver =
+    document.getElementById("game-over");
+
+const finalScore =
+    document.getElementById("final-score");
+
+const startButton =
+    document.getElementById("start-button");
+
+const restartButton =
+    document.getElementById("restart-button");
+
+
+/* =========================================================
+   CONFIG
+========================================================= */
+
+const MAX_ROUNDS = 10;
+
+/*
+    Tốc độ di chuyển tâm ruồi.
+
+    Đây là tốc độ khi giữ phím.
+*/
+const AIM_SPEED = 2.4;
+
+
+/*
+    Khi zoom thì điều chỉnh chậm hơn
+    để dễ căn chính xác.
+*/
+const ZOOM_AIM_SPEED = 1.1;
+
+
+/*
+    Tâm ruồi không được ra ngoài vùng kính.
+*/
+const AIM_LIMIT = 230;
+
+
+/*
+    Điểm tối đa ở chính xác tâm.
+*/
+const CENTER_RADIUS = 7;
+
+
+/*
+    Các vòng điểm.
+*/
+const RINGS = [
+    {
+        radius: 8,
+        score: 10
+    },
+    {
+        radius: 17,
+        score: 9
+    },
+    {
+        radius: 28,
+        score: 8
+    },
+    {
+        radius: 40,
+        score: 7
+    },
+    {
+        radius: 55,
+        score: 6
+    },
+    {
+        radius: 72,
+        score: 5
+    },
+    {
+        radius: 90,
+        score: 3
+    }
+];
+
+
+/* =========================================================
+   STATE
+========================================================= */
+
+let score = 0;
+
+let round = 1;
+
+let gameRunning = false;
+
+let zoomed = false;
+
+
+/*
+    Đây là vị trí của TÂM RUỒI
+    tính từ chính giữa màn hình.
+
+    Không liên quan đến mouse position.
+*/
+let aimX = 0;
+let aimY = 0;
+
+
+/*
+    Các phím đang được giữ.
+*/
+const keys = {};
+
+
+/* =========================================================
+   KEYBOARD
+========================================================= */
+
+document.addEventListener("keydown", (event) => {
+
+    /*
+        Không cho browser xử lý
+        Arrow / Space mặc định.
+    */
+    if (
+        [
+            "ArrowUp",
+            "ArrowDown",
+            "ArrowLeft",
+            "ArrowRight",
+            "Space"
+        ].includes(event.code)
+    ) {
+        event.preventDefault();
+    }
+
+
+    keys[event.code] = true;
+
+
+    /*
+        Z = zoom
+    */
+
+    if (
+        event.code === "KeyZ" &&
+        gameRunning
+    ) {
+        toggleZoom();
+    }
+
+
+    /*
+        R = reset tâm
+    */
+
+    if (
+        event.code === "KeyR" &&
+        gameRunning
+    ) {
+        resetAim();
+    }
+
+
+    /*
+        SPACE = bắn
+    */
+
+    if (
+        event.code === "Space" &&
+        gameRunning &&
+        !event.repeat
+    ) {
+        shoot();
+    }
+
+});
+
+
+document.addEventListener("keyup", (event) => {
+
+    keys[event.code] = false;
+
+});
+
+
+/* =========================================================
+   MOUSE
+========================================================= */
+
+/*
+    Mouse KHÔNG dùng để ngắm.
+
+    Click trái chỉ có tác dụng bắn.
+*/
+
+game.addEventListener("mousedown", (event) => {
+
+    if (!gameRunning) {
+        return;
+    }
+
+    /*
+        Không xử lý click vào button.
+    */
+    if (
+        event.target.tagName === "BUTTON"
+    ) {
+        return;
+    }
+
+    /*
+        Chỉ bắn.
+        Không lấy clientX.
+        Không lấy clientY.
+    */
+    if (event.button === 0) {
+        shoot();
+    }
+
+});
+
+
+/* =========================================================
+   START
+========================================================= */
+
+startButton.addEventListener(
+    "click",
+    startGame
+);
+
+
+restartButton.addEventListener(
+    "click",
+    startGame
+);
+
+
+function startGame() {
+
+    score = 0;
+
+    round = 1;
+
+    gameRunning = true;
+
+    zoomed = false;
+
+    aimX = 0;
+    aimY = 0;
+
+    startScreen.classList.add("hidden");
+
+    gameOver.classList.add("hidden");
+
+    game.classList.remove("zoomed");
+
+    modeElement.textContent = "1X";
+
+    updateHUD();
+
+    updateCrosshair();
+
+    clearBulletHoles();
+
+}
+
+
+/* =========================================================
+   GAME OVER
+========================================================= */
+
+function endGame() {
+
+    gameRunning = false;
+
+    finalScore.textContent = score;
+
+    gameOver.classList.remove("hidden");
+
+}
+
+
+/* =========================================================
+   AIM UPDATE
+========================================================= */
+
+/*
+    Đây là phần QUAN TRỌNG NHẤT.
+
+    aimX / aimY là vị trí tâm ruồi.
+
+    Ví dụ:
+
+    aimX = 0
+    aimY = 0
+
+    => tâm ruồi chính giữa màn hình.
+
+
+    aimX = 50
+
+    => tâm ruồi sang phải 50px.
+
+
+    aimY = -30
+
+    => tâm ruồi lên 30px.
+*/
+
+function updateAim() {
+
+    if (!gameRunning) {
+        return;
+    }
+
+
+    const speed =
+        zoomed
+            ? ZOOM_AIM_SPEED
+            : AIM_SPEED;
+
+
+    let dx = 0;
+    let dy = 0;
+
+
+    /*
+        W / ArrowUp
+    */
+
+    if (
+        keys["KeyW"] ||
+        keys["ArrowUp"]
+    ) {
+        dy -= speed;
+    }
+
+
+    /*
+        S / ArrowDown
+    */
+
+    if (
+        keys["KeyS"] ||
+        keys["ArrowDown"]
+    ) {
+        dy += speed;
+    }
+
+
+    /*
+        A / ArrowLeft
+    */
+
+    if (
+        keys["KeyA"] ||
+        keys["ArrowLeft"]
+    ) {
+        dx -= speed;
+    }
+
+
+    /*
+        D / ArrowRight
+    */
+
+    if (
+        keys["KeyD"] ||
+        keys["ArrowRight"]
+    ) {
+        dx += speed;
+    }
+
+
+    aimX += dx;
+
+    aimY += dy;
+
+
+    /*
+        Giới hạn tâm ruồi
+        trong vùng kính ngắm.
+    */
+
+    aimX = Math.max(
+        -AIM_LIMIT,
+        Math.min(AIM_LIMIT, aimX)
+    );
+
+    aimY = Math.max(
+        -AIM_LIMIT,
+        Math.min(AIM_LIMIT, aimY)
+    );
+
+
+    updateCrosshair();
+
+}
+
+
+/* =========================================================
+   CROSSHAIR
+========================================================= */
+
+function updateCrosshair() {
+
+    /*
+        aim-position nằm chính giữa màn hình.
+
+        crosshair được offset bởi aimX / aimY.
+    */
+
+    crosshair.style.transform =
+        `translate(
+            calc(-50% + ${aimX}px),
+            calc(-50% + ${aimY}px)
+        )`;
+
+}
+
+
+/* =========================================================
+   AIM LOOP
+========================================================= */
+
+function gameLoop() {
+
+    updateAim();
+
+    requestAnimationFrame(gameLoop);
+
+}
+
+gameLoop();
+
+
+/* =========================================================
+   RESET AIM
+========================================================= */
+
+function resetAim() {
+
+    aimX = 0;
+
+    aimY = 0;
+
+    updateCrosshair();
+
+}
+
+
+/* =========================================================
+   ZOOM
+========================================================= */
+
+function toggleZoom() {
+
+    zoomed = !zoomed;
+
+    if (zoomed) {
+
+        game.classList.add("zoomed");
+
+        modeElement.textContent = "2X";
+
+    } else {
+
+        game.classList.remove("zoomed");
+
+        modeElement.textContent = "1X";
+
+    }
+
+}
+
+
+/* =========================================================
+   SHOOT
+========================================================= */
+
+function shoot() {
+
+    if (!gameRunning) {
+        return;
+    }
+
+
+    /*
+        Flash.
+    */
+
+    shotFlash.classList.remove("flash");
+
+    void shotFlash.offsetWidth;
+
+    shotFlash.classList.add("flash");
+
+
+    /*
+        Lấy vị trí thật của target center
+        trên màn hình.
+    */
+
+    const targetRect =
+        target.getBoundingClientRect();
+
+
+    const targetCenterX =
+        targetRect.left +
+        targetRect.width / 2;
+
+
+    const targetCenterY =
+        targetRect.top +
+        targetRect.height / 2;
+
+
+    /*
+        Lấy vị trí tâm ruồi.
+
+        CỰC KỲ QUAN TRỌNG:
+
+        Không dùng mouse.
+
+        Tâm ruồi = center màn hình + aimX/Y.
+    */
+
+    const screenCenterX =
+        window.innerWidth / 2;
+
+
+    const screenCenterY =
+        window.innerHeight / 2;
+
+
+    const crosshairX =
+        screenCenterX + aimX;
+
+
+    const crosshairY =
+        screenCenterY + aimY;
+
+
+    /*
+        Khoảng cách giữa:
+
+        TÂM RUỒI
+
+        và
+
+        HỒNG TÂM BIA
+    */
+
+    const dx =
+        crosshairX -
+        targetCenterX;
+
+
+    const dy =
+        crosshairY -
+        targetCenterY;
+
+
+    const distance =
+        Math.sqrt(
+            dx * dx +
+            dy * dy
+        );
+
+
+    /*
+        Vẽ lỗ đạn tại vị trí
+        tâm ruồi trên bia.
+
+        Chỉ hiển thị nếu tâm ruồi
+        đang nằm trên bia.
+    */
+
+    if (
+        distance <= targetRect.width / 2
+    ) {
+
+        createBulletHole(
+            crosshairX,
+            crosshairY
+        );
+
+    }
+
+
+    /*
+        Tính điểm.
+    */
+
+    const points =
+        calculateScore(
+            distance,
+            targetRect.width
+        );
+
+
+    if (points > 0) {
+
+        score += points;
+
+        showHit(points);
+
+    } else {
+
+        showMiss();
+
+    }
+
+
+    updateHUD();
+
+
+    /*
+        Sang round tiếp theo.
+    */
+
+    if (round >= MAX_ROUNDS) {
+
+        setTimeout(
+            endGame,
+            450
+        );
+
+        return;
+
+    }
+
+
+    round++;
+
+    updateHUD();
+
+
+    /*
+        Sau mỗi phát:
+
+        đưa tâm ruồi về giữa.
+
+        Điều này mô phỏng việc
+        chuẩn bị cho phát tiếp theo.
+    */
+
+    setTimeout(() => {
+
+        if (gameRunning) {
+
+            resetAim();
+
+            clearBulletHoles();
+
+        }
+
+    }, 350);
+
+}
+
+
+/* =========================================================
+   CALCULATE SCORE
+========================================================= */
+
+function calculateScore(
+    distance,
+    targetSize
+) {
+
+    /*
+        targetSize thay đổi khi zoom.
+
+        Ta scale khoảng cách về
+        kích thước bia gốc.
+
+        Nhờ vậy zoom không làm
+        cách tính điểm sai.
+    */
+
+    const scale =
+        targetSize / 170;
+
+
+    const normalizedDistance =
+        distance / scale;
+
+
+    for (const ring of RINGS) {
+
+        if (
+            normalizedDistance <=
+            ring.radius
+        ) {
+
+            return ring.score;
+
+        }
+
+    }
+
+
+    return 0;
+
+}
+
+
+/* =========================================================
+   BULLET HOLE
+========================================================= */
+
+function createBulletHole(
+    x,
+    y
+) {
+
+    const hole =
+        document.createElement("div");
+
+
+    hole.className =
+        "bullet-hole";
+
+
+    /*
+        Đặt theo tọa độ màn hình.
+    */
+
+    hole.style.left =
+        `${x}px`;
+
+
+    hole.style.top =
+        `${y}px`;
+
+
+    game.appendChild(hole);
+
+
+    /*
+        Tự biến mất sau một lúc.
+    */
+
+    setTimeout(() => {
+
+        hole.remove();
+
+    }, 2500);
+
+}
+
+
+/* =========================================================
+   HIT TEXT
+========================================================= */
+
+function showHit(points) {
+
+    hitText.textContent =
+        `${points} ĐIỂM`;
+
+
+    hitText.classList.remove(
+        "hit-animation"
+    );
+
+
+    void hitText.offsetWidth;
+
+
+    hitText.classList.add(
+        "hit-animation"
+    );
+
+}
+
+
+function showMiss() {
+
+    hitText.textContent =
+        "MISS";
+
+
+    hitText.classList.remove(
+        "hit-animation"
+    );
+
+
+    void hitText.offsetWidth;
+
+
+    hitText.classList.add(
+        "hit-animation"
+    );
+
+}
+
+
+/* =========================================================
+   CLEAR BULLET HOLES
+========================================================= */
+
+function clearBulletHoles() {
+
+    document
+        .querySelectorAll(".bullet-hole")
+        .forEach(
+            hole => hole.remove()
+        );
+
+}
+
+
+/* =========================================================
+   HUD
+========================================================= */
+
+function updateHUD() {
+
+    scoreElement.textContent =
+        score;
+
+
+    roundElement.textContent =
+        `${round} / ${MAX_ROUNDS}`;
+
+
+    distanceElement.textContent =
+        zoomed
+            ? "50 m • ZOOM"
+            : "50 m";
+
+}
+
+
+/* =========================================================
+   RESIZE
+========================================================= */
+
+window.addEventListener(
+    "resize",
+    updateCrosshair
+);
+
+</script>
+
+</body>
+</html>
