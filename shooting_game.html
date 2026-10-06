@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Target Shooting</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+    }
+
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+      background:
+        radial-gradient(circle at center, #263238 0%, #111 70%);
+      color: white;
+      cursor: none;
+    }
+
+    #game {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* HUD */
+    #hud {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      right: 20px;
+
+      display: flex;
+      justify-content: space-between;
+
+      z-index: 100;
+
+      font-size: 22px;
+      font-weight: bold;
+
+      pointer-events: none;
+    }
+
+    .hud-box {
+      background: rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(6px);
+
+      padding: 10px 18px;
+      border-radius: 12px;
+
+      border: 1px solid rgba(255,255,255,0.15);
+    }
+
+    /* Target */
+
+    .target {
+      position: absolute;
+
+      width: 90px;
+      height: 90px;
+
+      border-radius: 50%;
+
+      background:
+        radial-gradient(
+          circle,
+          #ffeb3b 0%,
+          #ffeb3b 13%,
+          #e53935 14%,
+          #e53935 30%,
+          white 31%,
+          white 48%,
+          #e53935 49%,
+          #e53935 67%,
+          white 68%
+        );
+
+      border: 4px solid #222;
+
+      box-shadow:
+        0 8px 20px rgba(0,0,0,0.5),
+        inset 0 0 10px rgba(0,0,0,0.3);
+
+      transition: transform 0.08s;
+    }
+
+    .target::after {
+      content: "";
+
+      position: absolute;
+
+      left: 50%;
+      bottom: -80px;
+
+      width: 8px;
+      height: 80px;
+
+      transform: translateX(-50%);
+
+      background: linear-gradient(#795548, #3e2723);
+
+      z-index: -1;
+    }
+
+    /* Crosshair */
+
+    #crosshair {
+      position: fixed;
+
+      width: 50px;
+      height: 50px;
+
+      transform: translate(-50%, -50%);
+
+      pointer-events: none;
+
+      z-index: 999;
+    }
+
+    #crosshair::before,
+    #crosshair::after {
+      content: "";
+
+      position: absolute;
+
+      background: rgba(255,255,255,0.9);
+
+      box-shadow: 0 0 4px black;
+    }
+
+    #crosshair::before {
+      width: 2px;
+      height: 50px;
+
+      left: 24px;
+    }
+
+    #crosshair::after {
+      width: 50px;
+      height: 2px;
+
+      top: 24px;
+    }
+
+    .crosshair-circle {
+      position: absolute;
+
+      width: 24px;
+      height: 24px;
+
+      left: 13px;
+      top: 13px;
+
+      border: 2px solid #ff3d00;
+      border-radius: 50%;
+    }
+
+    /* Shot mark */
+
+    .shot {
+      position: absolute;
+
+      width: 14px;
+      height: 14px;
+
+      border-radius: 50%;
+
+      background: #111;
+
+      border: 2px solid #555;
+
+      transform: translate(-50%, -50%);
+
+      pointer-events: none;
+
+      box-shadow: 0 0 8px black;
+
+      animation: shotFade 1s forwards;
+    }
+
+    @keyframes shotFade {
+      0% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1.8);
+      }
+
+      100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(1);
+      }
+    }
+
+    /* Score popup */
+
+    .score-popup {
+      position: absolute;
+
+      font-size: 26px;
+      font-weight: bold;
+
+      color: #ffeb3b;
+
+      pointer-events: none;
+
+      text-shadow: 0 2px 5px black;
+
+      animation: popup 0.8s forwards;
+
+      z-index: 200;
+    }
+
+    @keyframes popup {
+      0% {
+        opacity: 1;
+        transform: translate(-50%, 0) scale(0.8);
+      }
+
+      100% {
+        opacity: 0;
+        transform: translate(-50%, -70px) scale(1.3);
+      }
+    }
+
+    /* Start / Game over */
+
+    #overlay {
+      position: absolute;
+
+      inset: 0;
+
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+
+      background: rgba(0, 0, 0, 0.75);
+
+      z-index: 1000;
+
+      cursor: default;
+    }
+
+    #overlay h1 {
+      font-size: 64px;
+      margin: 0 0 10px;
+
+      letter-spacing: 3px;
+    }
+
+    #overlay p {
+      font-size: 20px;
+
+      color: #ccc;
+
+      margin-bottom: 30px;
+    }
+
+    #startBtn {
+      border: none;
+
+      padding: 16px 40px;
+
+      font-size: 22px;
+      font-weight: bold;
+
+      border-radius: 12px;
+
+      background: #ff3d00;
+      color: white;
+
+      cursor: pointer;
+
+      transition: 0.2s;
+    }
+
+    #startBtn:hover {
+      transform: scale(1.08);
+      background: #ff5722;
+    }
+
+    /* background floor */
+
+    #floor {
+      position: absolute;
+
+      bottom: 0;
+
+      width: 100%;
+      height: 22%;
+
+      background:
+        linear-gradient(
+          rgba(0,0,0,0),
+          rgba(0,0,0,0.35)
+        ),
+        repeating-linear-gradient(
+          90deg,
+          #5d4037 0px,
+          #5d4037 80px,
+          #4e342e 81px,
+          #4e342e 160px
+        );
+
+      border-top: 5px solid #3e2723;
+    }
+
+    #message {
+      position: absolute;
+
+      left: 50%;
+      top: 100px;
+
+      transform: translateX(-50%);
+
+      font-size: 30px;
+      font-weight: bold;
+
+      opacity: 0;
+
+      pointer-events: none;
+    }
+
+    .show-message {
+      animation: message 0.5s;
+    }
+
+    @keyframes message {
+      0% { opacity: 0; transform: translate(-50%, -20px); }
+      30% { opacity: 1; }
+      100% { opacity: 0; transform: translate(-50%, 10px); }
+    }
+  </style>
+</head>
+
+<body>
+
+<div id="game">
+
+  <div id="floor"></div>
+
+  <div id="hud">
+    <div class="hud-box">
+      SCORE:
+      <span id="score">0</span>
+    </div>
+
+    <div class="hud-box">
+      COMBO:
+      <span id="combo">0</span>x
+    </div>
+
+    <div class="hud-box">
+      TIME:
+      <span id="time">30</span>
+    </div>
+  </div>
+
+  <div id="message">
+    HEADSHOT
+  </div>
+
+  <div id="crosshair">
+    <div class="crosshair-circle"></div>
+  </div>
+
+  <div id="overlay">
+    <h1>TARGET SHOOTING</h1>
+
+    <p>
+      Di chuột để ngắm · Click để bắn · Tâm bia được nhiều điểm hơn
+    </p>
+
+    <button id="startBtn">
+      START GAME
+    </button>
+  </div>
+
+</div>
+
+<script>
+  const game = document.getElementById("game");
+
+  const scoreText = document.getElementById("score");
+  const comboText = document.getElementById("combo");
+  const timeText = document.getElementById("time");
+
+  const overlay = document.getElementById("overlay");
+  const startBtn = document.getElementById("startBtn");
+
+  const crosshair = document.getElementById("crosshair");
+  const message = document.getElementById("message");
+
+  let score = 0;
+  let combo = 0;
+
+  let timeLeft = 30;
+
+  let running = false;
+
+  let timerInterval;
+  let spawnInterval;
+
+  const targets = [];
+
+  // -----------------------------
+  // CROSSHAIR
+  // -----------------------------
+
+  document.addEventListener("mousemove", e => {
+
+    crosshair.style.left = e.clientX + "px";
+    crosshair.style.top = e.clientY + "px";
+
+  });
+
+
+  // -----------------------------
+  // CREATE TARGET
+  // -----------------------------
+
+  function createTarget() {
+
+    if (!running) return;
+
+    const target = document.createElement("div");
+
+    target.className = "target";
+
+    // random size
+    const size = 55 + Math.random() * 55;
+
+    target.style.width = size + "px";
+    target.style.height = size + "px";
+
+    const maxY = window.innerHeight * 0.65;
+
+    const y =
+      120 +
+      Math.random() * (maxY - 120);
+
+    target.style.top = y + "px";
+
+    // target bắt đầu ngoài màn hình
+
+    const fromLeft = Math.random() > 0.5;
+
+    let x;
+
+    if (fromLeft) {
+
+      x = -size;
+
+    } else {
+
+      x = window.innerWidth + size;
+
+    }
+
+    target.style.left = x + "px";
+
+    const speed =
+      1.5 +
+      Math.random() * 3;
+
+    const targetData = {
+
+      element: target,
+
+      x,
+
+      speed:
+        fromLeft
+        ? speed
+        : -speed,
+
+      size
+
+    };
+
+    targets.push(targetData);
+
+    game.appendChild(target);
+
+
+    target.addEventListener("mousedown", e => {
+
+      if (!running) return;
+
+      e.stopPropagation();
+
+      shootTarget(e, targetData);
+
+    });
+
+  }
+
+
+  // -----------------------------
+  // SHOOT TARGET
+  // -----------------------------
+
+  function shootTarget(event, targetData) {
+
+    const target = targetData.element;
+
+    const rect =
+      target.getBoundingClientRect();
+
+    const centerX =
+      rect.left +
+      rect.width / 2;
+
+    const centerY =
+      rect.top +
+      rect.height / 2;
+
+    const dx =
+      event.clientX -
+      centerX;
+
+    const dy =
+      event.clientY -
+      centerY;
+
+    const distance =
+      Math.sqrt(dx * dx + dy * dy);
+
+    const radius =
+      rect.width / 2;
+
+
+    /*
+      Điểm:
+
+      tâm       = 100
+      gần tâm   = 70
+      vòng ngoài = 40
+    */
+
+    let points;
+
+    if (distance < radius * 0.2) {
+
+      points = 100;
+
+      showMessage("BULLSEYE!");
+
+    }
+
+    else if (distance < radius * 0.5) {
+
+      points = 70;
+
+    }
+
+    else {
+
+      points = 40;
+
+    }
+
+
+    combo++;
+
+    points += combo * 5;
+
+    score += points;
+
+
+    scoreText.textContent =
+      score;
+
+    comboText.textContent =
+      combo;
+
+
+    createPopup(
+      event.clientX,
+      event.clientY,
+      "+" + points
+    );
+
+
+    target.style.transform =
+      "scale(1.3)";
+
+
+    setTimeout(() => {
+
+      removeTarget(targetData);
+
+    }, 70);
+
+  }
+
+
+  // -----------------------------
+  // MISS
+  // -----------------------------
+
+  game.addEventListener("mousedown", e => {
+
+    if (!running) return;
+
+    combo = 0;
+
+    comboText.textContent =
+      combo;
+
+    createShot(
+      e.clientX,
+      e.clientY
+    );
+
+  });
+
+
+  // -----------------------------
+  // BULLET HOLE
+  // -----------------------------
+
+  function createShot(x, y) {
+
+    const shot =
+      document.createElement("div");
+
+    shot.className =
+      "shot";
+
+    shot.style.left =
+      x + "px";
+
+    shot.style.top =
+      y + "px";
+
+    game.appendChild(shot);
+
+    setTimeout(() => {
+
+      shot.remove();
+
+    }, 1000);
+
+  }
+
+
+  // -----------------------------
+  // SCORE POPUP
+  // -----------------------------
+
+  function createPopup(x, y, text) {
+
+    const popup =
+      document.createElement("div");
+
+    popup.className =
+      "score-popup";
+
+    popup.textContent =
+      text;
+
+    popup.style.left =
+      x + "px";
+
+    popup.style.top =
+      y + "px";
+
+    game.appendChild(popup);
+
+    setTimeout(() => {
+
+      popup.remove();
+
+    }, 800);
+
+  }
+
+
+  // -----------------------------
+  // MESSAGE
+  // -----------------------------
+
+  function showMessage(text) {
+
+    message.textContent =
+      text;
+
+    message.classList.remove(
+      "show-message"
+    );
+
+    void message.offsetWidth;
+
+    message.classList.add(
+      "show-message"
+    );
+
+  }
+
+
+  // -----------------------------
+  // MOVE TARGETS
+  // -----------------------------
+
+  function update() {
+
+    if (!running) return;
+
+    for (
+      let i = targets.length - 1;
+      i >= 0;
+      i--
+    ) {
+
+      const target =
+        targets[i];
+
+      target.x +=
+        target.speed;
+
+      target.element.style.left =
+        target.x + "px";
+
+
+      if (
+        target.x <
+        -target.size * 2
+        ||
+        target.x >
+        window.innerWidth +
+        target.size * 2
+      ) {
+
+        removeTarget(target);
+
+      }
+
+    }
+
+    requestAnimationFrame(update);
+
+  }
+
+
+  // -----------------------------
+  // REMOVE TARGET
+  // -----------------------------
+
+  function removeTarget(targetData) {
+
+    const index =
+      targets.indexOf(
+        targetData
+      );
+
+    if (index !== -1) {
+
+      targets.splice(
+        index,
+        1
+      );
+
+    }
+
+    targetData.element.remove();
+
+  }
+
+
+  // -----------------------------
+  // START GAME
+  // -----------------------------
+
+  function startGame() {
+
+    score = 0;
+    combo = 0;
+    timeLeft = 30;
+
+    scoreText.textContent =
+      score;
+
+    comboText.textContent =
+      combo;
+
+    timeText.textContent =
+      timeLeft;
+
+    running = true;
+
+    overlay.style.display =
+      "none";
+
+
+    // tạo bia liên tục
+
+    spawnInterval =
+      setInterval(() => {
+
+        createTarget();
+
+      }, 650);
+
+
+    // tạo vài bia ban đầu
+
+    createTarget();
+    createTarget();
+
+
+    timerInterval =
+      setInterval(() => {
+
+        timeLeft--;
+
+        timeText.textContent =
+          timeLeft;
+
+        if (timeLeft <= 0) {
+
+          endGame();
+
+        }
+
+      }, 1000);
+
+
+    update();
+
+  }
+
+
+  // -----------------------------
+  // END GAME
+  // -----------------------------
+
+  function endGame() {
+
+    running = false;
+
+    clearInterval(
+      timerInterval
+    );
+
+    clearInterval(
+      spawnInterval
+    );
+
+
+    targets.forEach(
+      target =>
+        target.element.remove()
+    );
+
+    targets.length = 0;
+
+
+    overlay.style.display =
+      "flex";
+
+    overlay.innerHTML = `
+      <h1>TIME UP</h1>
+
+      <p style="font-size:30px">
+        SCORE:
+        <strong style="color:#ffeb3b">
+          ${score}
+        </strong>
+      </p>
+
+      <button
+        id="restartBtn"
+      >
+        PLAY AGAIN
+      </button>
+    `;
+
+
+    const restartBtn =
+      document.getElementById(
+        "restartBtn"
+      );
+
+
+    restartBtn.style.border =
+      "none";
+
+    restartBtn.style.padding =
+      "16px 40px";
+
+    restartBtn.style.fontSize =
+      "22px";
+
+    restartBtn.style.fontWeight =
+      "bold";
+
+    restartBtn.style.borderRadius =
+      "12px";
+
+    restartBtn.style.background =
+      "#ff3d00";
+
+    restartBtn.style.color =
+      "white";
+
+    restartBtn.style.cursor =
+      "pointer";
+
+
+    restartBtn.onclick =
+      startGame;
+
+  }
+
+
+  startBtn.addEventListener(
+    "click",
+    startGame
+  );
+
+</script>
+
+</body>
+</html>
