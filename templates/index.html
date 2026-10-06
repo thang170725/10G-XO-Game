@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XO 20x20 - Đấu Với Bot Kiện Tướng</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+            background: #eeeeee;
+        }
+
+        .game {
+            padding: 20px;
+            text-align: center;
+        }
+
+        h1 {
+            margin: 0 0 10px;
+        }
+
+        .controls {
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .controls label {
+            font-weight: bold;
+        }
+
+        .controls select {
+            padding: 6px 12px;
+            font-size: 15px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            outline: none;
+            background-color: white;
+            cursor: pointer;
+        }
+
+        #player-info {
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+
+        #status {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            min-height: 28px;
+        }
+
+        .board-container {
+            width: min(95vw, 800px);
+            height: min(75vh, 800px);
+            margin: auto;
+            overflow: auto;
+            background: white;
+            border: 2px solid #333;
+            border-radius: 4px;
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(20, 35px);
+            grid-template-rows: repeat(20, 35px);
+            width: 700px;
+            height: 700px;
+        }
+
+        .cell {
+            width: 35px;
+            height: 35px;
+            padding: 0;
+            border: 1px solid #cccccc;
+            background: white;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.1s;
+        }
+
+        .cell:hover:not(:disabled) {
+            background: #eeeeee;
+        }
+
+        .cell:disabled {
+            cursor: default;
+        }
+
+        .cell[data-symbol="X"] {
+            color: #d9534f;
+        }
+
+        .cell[data-symbol="O"] {
+            color: #0275d8;
+        }
+
+        #restart {
+            margin-top: 15px;
+            padding: 10px 25px;
+            border: none;
+            border-radius: 8px;
+            background: black;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        #restart:hover {
+            opacity: 0.8;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="game">
+    <h1>🎮 XO 20 × 20</h1>
+
+    <div class="controls">
+        <div>
+            <label for="game-mode">Chế độ chơi:</label>
+            <select id="game-mode">
+                <option value="pve" selected>🤖 Đánh với Máy (PvE)</option>
+                <option value="pvp">👥 2 Người chơi (PvP)</option>
+            </select>
+        </div>
+
+        <div id="difficulty-group">
+            <label for="difficulty">Độ khó Bot:</label>
+            <select id="difficulty">
+                <option value="novice">Mới chơi</option>
+                <option value="easy">Dễ</option>
+                <option value="medium">Trung bình</option>
+                <option value="master" selected>🏆 Kiện tướng</option>
+            </select>
+        </div>
+    </div>
+
+    <div id="player-info">Đang kết nối...</div>
+    <div id="status"></div>
+
+    <div class="board-container">
+        <div id="board" class="board"></div>
+    </div>
+
+    <button id="restart">Chơi lại</button>
+</div>
+
+<script>
+    const BOARD_SIZE = 20;
+    const TOTAL_CELLS = BOARD_SIZE * BOARD_SIZE;
+
+    let playerId = localStorage.getItem("player_id");
+    if (!playerId) {
+        playerId = crypto.randomUUID();
+        localStorage.setItem("player_id", playerId);
+    }
+
+    let mySymbol = null;
+
+    const boardElement = document.getElementById("board");
+    const playerInfo = document.getElementById("player-info");
+    const statusElement = document.getElementById("status");
+    const restartButton = document.getElementById("restart");
+    const modeSelect = document.getElementById("game-mode");
+    const difficultySelect = document.getElementById("difficulty");
+    const difficultyGroup = document.getElementById("difficulty-group");
+
+    modeSelect.addEventListener("change", () => {
+        if (modeSelect.value === "pvp") {
+            difficultyGroup.style.display = "none";
+        } else {
+            difficultyGroup.style.display = "inline-block";
+        }
+    });
+
+    for (let i = 0; i < TOTAL_CELLS; i++) {
+        const cell = document.createElement("button");
+        cell.className = "cell";
+        cell.dataset.position = i;
+        cell.addEventListener("click", () => makeMove(i));
+        boardElement.appendChild(cell);
+    }
+
+    const cells = document.querySelectorAll(".cell");
+
+    async function joinGame() {
+        const response = await fetch("/join", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ player_id: playerId, symbol: "X" })
+        });
+
+        const data = await response.json();
+        mySymbol = data.symbol;
+
+        if (mySymbol) {
+            playerInfo.textContent = `Bạn là quân ${mySymbol}`;
+        } else {
+            playerInfo.textContent = "Không thể tham gia game";
+        }
+    }
+
+    async function getState() {
+        const response = await fetch("/state");
+        const data = await response.json();
+        renderGame(data);
+    }
+
+    function renderGame(data) {
+        data.board.forEach((value, index) => {
+            cells[index].textContent = value;
+            cells[index].setAttribute("data-symbol", value);
+
+            cells[index].disabled =
+                Boolean(value) ||
+                !mySymbol ||
+                Boolean(data.winner) ||
+                data.current_player !== mySymbol;
+        });
+
+        if (data.winner === "DRAW") {
+            statusElement.textContent = "🤝 Hòa!";
+            return;
+        }
+
+        if (data.winner) {
+            statusElement.textContent = `🎉 ${data.winner} thắng!`;
+            return;
+        }
+
+        if (!mySymbol) {
+            statusElement.textContent = "Đang chờ...";
+            return;
+        }
+
+        if (data.current_player === mySymbol) {
+            statusElement.textContent = "🔥 Tới lượt bạn!";
+        } else {
+            const isPve = modeSelect.value === "pve";
+            statusElement.textContent = isPve ? "🤖 Máy đang suy nghĩ..." : `⏳ Đang chờ ${data.current_player}...`;
+        }
+    }
+
+    async function makeMove(position) {
+        if (!mySymbol) return;
+
+        const mode = modeSelect.value;
+        const difficulty = difficultySelect.value;
+
+        await fetch("/move", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                player_id: playerId,
+                position: position,
+                mode: mode,
+                difficulty: difficulty
+            })
+        });
+
+        await getState();
+    }
+
+    restartButton.addEventListener("click", async () => {
+        await fetch("/restart", { method: "POST" });
+        await getState();
+    });
+
+    async function startGame() {
+        await joinGame();
+        await getState();
+        setInterval(getState, 500);
+    }
+
+    startGame();
+</script>
+
+</body>
+</html>
